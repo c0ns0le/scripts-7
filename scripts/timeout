@@ -50,7 +50,7 @@ watchit()
 watchit $1& a=$!         #start the timeout
 shift                    #first param was timeout for sleep
 trap "cleanup" ALRM INT  #cleanup after timeout
-"$@"& wait $!; RET=$?    #start the job wait for it and save its return value
+"$@" <&0 & wait $!; RET=$?    #start the job wait for it and save its return value
 kill -ALRM $a            #send ALRM signal to watchit
 wait $a                  #wait for watchit to finish cleanup
 exit $RET                #return the value
