@@ -258,6 +258,9 @@ s#${p}10\([0-7]\)m#${p}4\1m${p}1m#g;
 
 # change 'reset' code to \"R
 s#${p}0m#\"R;#g
+
+# change 'revert' code to \"U
+s#${p}27m#\"U;#g
 " |
 
 # Convert SGR sequences to HTML
@@ -450,6 +453,10 @@ function encode(string,start,end,i,ret,pos,sc,buf) {
                   dump[pos,y]=" "
                 }
               }
+          }
+          else if(cc=="U") {
+              # Revert last color
+	      if (spc) delete span[spc--]
           }
           else if(cc=="R") {
               # Reset attributes
