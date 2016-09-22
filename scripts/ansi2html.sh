@@ -1,4 +1,5 @@
 #!/bin/sh
+# NOTE: file encoding is UTF-8
 
 # Convert ANSI (terminal) colours and attributes to HTML
 
@@ -34,32 +35,36 @@
 #                         Strip more terminal control codes.
 #    V0.23, 28 Feb 2016
 #      http://github.com/pixelb/scripts/commits/master/scripts/ansi2html.sh
+#    V0.24-pre.1, 22 Sep 2016, cxw42 @ github
+#                         Add --flow option for non-preformatted text
 
 gawk --version >/dev/null || exit 1
 
 if [ "$1" = "--version" ]; then
-    printf '0.23\n' && exit
+    printf '0.24-pre.1\n' && exit
 fi
 
 usage()
 {
 printf '%s\n' \
 'This utility converts ANSI codes in data passed to stdin
-It has 4 optional parameters:
---bg=dark --palette=linux|solarized|tango|xterm --css-only|--body-only
-E.g.: ls -l --color=always | ansi2html.sh --bg=dark > ls.html' >&2
+It has five optional parameters:
+--bg=dark --palette=linux|solarized|tango|xterm --css-only|--body-only --flow
+E.g.: ls -l --color=always | ansi2html.sh --bg=dark > ls.html
+Caution: --flow may not work with files including cursor movements.' >&2
     exit
 }
 
-if [ "$1" = "--help" ]; then
+case "$1" in ("--help"|"-h"|"-?")
     usage
-fi
+esac
 
 processArg()
 {
     [ "$1" = "--bg=dark" ] && { dark_bg=yes; return; }
     [ "$1" = "--css-only" ] && { css_only=yes; return; }
     [ "$1" = "--body-only" ] && { body_only=yes; return; }
+    [ "$1" = "--flow" ] && { flow_output=yes; return; }
     if [ "$1" = "--palette=solarized" ]; then
        # See http://ethanschoonover.com/solarized
        P0=073642;  P1=D30102;  P2=859900;  P3=B58900;
@@ -193,8 +198,9 @@ span { display: inline-block; }
 </head>
 
 <body class="f9 b9">
-<pre>
 '
+[ "$flow_output" ] || [ "$body_only" ] || printf '%s\n' '<pre>'
+
 [ "$body_only" ] && printf '%s\n' 'Be sure to use <body class="f9 b9"> and <pre>' >&2
 
 p='\x1b\['        #shortcut to match escape codes
@@ -228,7 +234,7 @@ s#${p}\([0-9]\{1,\}\)P#\"X\1;#g
 
 s#${p}[0-9;?]*[^0-9;?m]##g
 
-" |
+" | tee foo1.txt |
 
 # Normalize the input before transformation
 sed "
@@ -258,7 +264,7 @@ s#${p}10\([0-7]\)m#${p}4\1m${p}1m#g;
 
 # change 'reset' code to \"R
 s#${p}0m#\"R;#g
-" |
+" | tee foo2.txt | 
 
 # Convert SGR sequences to HTML
 sed "
@@ -282,7 +288,18 @@ s#${p}38;5;\([0-9]\{1,3\}\)m#<span class=\"ef\1\">#g
 s#${p}48;5;\([0-9]\{1,3\}\)m#<span class=\"eb\1\">#g
 
 s#${p}[0-9;]*m##g # strip unhandled codes
-" |
+" | tee foo3.txt | 
+
+# Handle flowing text.  We have already escaped HTML, so can add line
+# breaks here.  We add <br/> instead of <p/> because <br> is "phrasing
+# content", so is allowed inside <span>.  <p> is not allowed inside <span>.
+# A <span> may be open, e.g., if a color crosses multiple lines.
+# Source: https://html.spec.whatwg.org/multipage/dom.html#phrasing-content
+if [[ "$flow_output" ]]; then
+  sed 's#$#<br/>#'
+else
+  cat # pass unchanged if we're not using flow content
+fi | tee foo4.txt |
 
 # Convert alternative character set and handle cursor movement codes
 # Note we convert here, as if we do at start we have to worry about avoiding
@@ -305,7 +322,7 @@ s#\x0E#\"T1;#g;
 
 s#\x1b(B#\"T0;#g
 s#\x0F#\"T0;#g
-" |
+" | tee foo5.txt | 
 (
 gawk '
 function dump_line(l,del,c,blanks,ret) {
@@ -509,6 +526,9 @@ END {
 }'
 )
 
-[ "$body_only" ] || printf '</pre>
-</body>
+[ "$flow_output" ] || [ "$body_only" ] || printf '</pre>\n'
+[ "$body_only" ] || printf '</body>
 </html>\n'
+
+# vi: set ts=2 sts=2 sw=2 et ai: #
+
