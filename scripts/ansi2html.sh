@@ -33,7 +33,7 @@
 #                         Handle codes with combined attributes and color.
 #                         Handle isolated <bold> attributes with css.
 #                         Strip more terminal control codes.
-#    V0.23, 28 Feb 2016
+#    V0.24, 14 Sep 2017
 #      http://github.com/pixelb/scripts/commits/master/scripts/ansi2html.sh
 #    V0.24-pre.1, 22 Sep 2016, cxw42 @ github
 #                         Add --flow option for non-preformatted text
@@ -132,7 +132,9 @@ fi
 <meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\"/>
 <style type=\"text/css\">
 "
-[ "$body_only" ] || printf ".ef0,.f0 { color: #$P0; } .eb0,.b0 { background-color: #$P0; }
+[ "$body_only" ] || printf "
+pre { font-family: menlo; font-size:11px;}
+.ef0,.f0 { color: #$P0; } .eb0,.b0 { background-color: #$P0; }
 .ef1,.f1 { color: #$P1; } .eb1,.b1 { background-color: #$P1; }
 .ef2,.f2 { color: #$P2; } .eb2,.b2 { background-color: #$P2; }
 .ef3,.f3 { color: #$P3; } .eb3,.b3 { background-color: #$P3; }
@@ -186,11 +188,16 @@ done
   color: '`[ "$dark_bg" ] && printf "#$P15;" || printf "#$P0;"`'
   font-weight: '`[ "$dark_bg" ] && printf 'normal;' || printf 'bold;'`'
 }
-.reverse {
-  /* CSS does not support swapping fg and bg colours unfortunately,
-     so just hardcode something that will look OK on all backgrounds. */
-  '"color: #$P0; background-color: #$P7;"'
-}
+.f9 .reverse { background-color: #'`[ "$dark_bg" ] && printf $P15 || printf $P0`'; }
+.b9 .reverse { color: '`[ "$dark_bg" ] && printf "#$P0;" || printf "#$P15;"`' }
+.f1 > .reverse { '"background-color: #$P1;"' }
+.f2 > .reverse { '"background-color: #$P2;"' }
+.f3 > .reverse { '"background-color: #$P3;"' }
+.f4 > .reverse { '"background-color: #$P4;"' }
+.f5 > .reverse { '"background-color: #$P5;"' }
+.f6 > .reverse { '"background-color: #$P6;"' }
+.f7 > .reverse { '"background-color: #$P7;"' }
+/* the rest of the color reverses are pending... read - when someone complains they are missing ;) */
 .underline { text-decoration: underline; }
 .line-through { text-decoration: line-through; }
 .blink { text-decoration: blink; }
@@ -252,6 +259,12 @@ sed "
 # escape HTML (ampersand and quote done above)
 s#>#\&gt;#g; s#<#\&lt;#g;
 
+# handle truecolor
+s#${p}38;2;\([0-9]\{1,3\}\);\([0-9]\{1,3\}\);\([0-9]\{1,3\}\)m#\
+<span style=\"color:rgb(\1\,\2\,\3\)\">#g
+s#${p}48;2;\([0-9]\{1,3\}\);\([0-9]\{1,3\}\);\([0-9]\{1,3\}\)m#\
+<span style=\"background-color:rgb(\1\,\2\,\3\)\">#g
+
 # normalize SGR codes a little
 
 # split 256 colors out and mark so that they're not
@@ -275,6 +288,9 @@ s#${p}10\([0-7]\)m#${p}4\1m${p}1m#g;
 
 # change 'reset' code to \"R
 s#${p}0m#\"R;#g
+
+# change 'revert' code to \"U
+s#${p}27m#\"U;#g
 " | debug_to 'foo2-normalized.txt' |
 
 # Convert SGR sequences to HTML
@@ -479,6 +495,10 @@ function encode(string,start,end,i,ret,pos,sc,buf) {
                   dump[pos,y]=" "
                 }
               }
+          }
+          else if(cc=="U") {
+              # Revert last color
+	      if (spc) delete span[spc--]
           }
           else if(cc=="R") {
               # Reset attributes
