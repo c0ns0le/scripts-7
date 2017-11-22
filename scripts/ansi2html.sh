@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # NOTE: file encoding is UTF-8
 
 # Convert ANSI (terminal) colours and attributes to HTML
@@ -59,12 +59,23 @@ case "$1" in ("--help"|"-h"|"-?")
     usage
 esac
 
+# tee a copy to $1, if $debug_output is set.
+debug_to()
+{
+  if [[ $debug_output = 'yes' ]]; then
+    tee "$1"
+  else
+    cat   # passthrough if not debugging
+  fi
+}
+
 processArg()
 {
     [ "$1" = "--bg=dark" ] && { dark_bg=yes; return; }
     [ "$1" = "--css-only" ] && { css_only=yes; return; }
     [ "$1" = "--body-only" ] && { body_only=yes; return; }
     [ "$1" = "--flow" ] && { flow_output=yes; return; }
+    [ "$1" = "--debug" ] && { debug_output=yes; return; }
     if [ "$1" = "--palette=solarized" ]; then
        # See http://ethanschoonover.com/solarized
        P0=073642;  P1=D30102;  P2=859900;  P3=B58900;
@@ -234,7 +245,7 @@ s#${p}\([0-9]\{1,\}\)P#\"X\1;#g
 
 s#${p}[0-9;?]*[^0-9;?m]##g
 
-" | tee foo1.txt |
+" | debug_to 'foo1-xtermed.txt' |
 
 # Normalize the input before transformation
 sed "
@@ -264,7 +275,7 @@ s#${p}10\([0-7]\)m#${p}4\1m${p}1m#g;
 
 # change 'reset' code to \"R
 s#${p}0m#\"R;#g
-" | tee foo2.txt | 
+" | debug_to 'foo2-normalized.txt' |
 
 # Convert SGR sequences to HTML
 sed "
@@ -288,7 +299,7 @@ s#${p}38;5;\([0-9]\{1,3\}\)m#<span class=\"ef\1\">#g
 s#${p}48;5;\([0-9]\{1,3\}\)m#<span class=\"eb\1\">#g
 
 s#${p}[0-9;]*m##g # strip unhandled codes
-" | tee foo3.txt | 
+" | debug_to 'foo3-sgr-html.txt' |
 
 # Handle flowing text.  We have already escaped HTML, so can add line
 # breaks here.  We add <br/> instead of <p/> because <br> is "phrasing
@@ -299,7 +310,7 @@ if [[ "$flow_output" ]]; then
   sed 's#$#<br/>#'
 else
   cat # pass unchanged if we're not using flow content
-fi | tee foo4.txt |
+fi | debug_to 'foo4-with-brs.txt' |
 
 # Convert alternative character set and handle cursor movement codes
 # Note we convert here, as if we do at start we have to worry about avoiding
@@ -322,7 +333,8 @@ s#\x0E#\"T1;#g;
 
 s#\x1b(B#\"T0;#g
 s#\x0F#\"T0;#g
-" | tee foo5.txt | 
+" | debug_to 'foo5-smacs-rmacs.txt' |
+
 (
 gawk '
 function dump_line(l,del,c,blanks,ret) {
@@ -524,7 +536,7 @@ END {
     print dump_screen();
   }
 }'
-)
+) | debug_to 'foo6-gawk.txt'
 
 [ "$flow_output" ] || [ "$body_only" ] || printf '</pre>\n'
 [ "$body_only" ] || printf '</body>
