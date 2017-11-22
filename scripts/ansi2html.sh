@@ -172,11 +172,16 @@ done
   color: '`[ "$dark_bg" ] && printf "#$P15;" || printf "#$P0;"`'
   font-weight: '`[ "$dark_bg" ] && printf 'normal;' || printf 'bold;'`'
 }
-.reverse {
-  /* CSS does not support swapping fg and bg colours unfortunately,
-     so just hardcode something that will look OK on all backgrounds. */
-  '"color: #$P0; background-color: #$P7;"'
-}
+.f9 .reverse { background-color: #'`[ "$dark_bg" ] && printf $P15 || printf $P0`'; }
+.b9 .reverse { color: '`[ "$dark_bg" ] && printf "#$P0;" || printf "#$P15;"`' }
+.f1 > .reverse { '"background-color: #$P1;"' }
+.f2 > .reverse { '"background-color: #$P2;"' }
+.f3 > .reverse { '"background-color: #$P3;"' }
+.f4 > .reverse { '"background-color: #$P4;"' }
+.f5 > .reverse { '"background-color: #$P5;"' }
+.f6 > .reverse { '"background-color: #$P6;"' }
+.f7 > .reverse { '"background-color: #$P7;"' }
+/* the rest of the color reverses are pending... read - when someone complains they are missing ;) */
 .underline { text-decoration: underline; }
 .line-through { text-decoration: line-through; }
 .blink { text-decoration: blink; }
@@ -266,6 +271,9 @@ s#${p}10\([0-7]\)m#${p}4\1m${p}1m#g;
 
 # change 'reset' code to \"R
 s#${p}0m#\"R;#g
+
+# change 'revert' code to \"U
+s#${p}27m#\"U;#g
 " |
 
 # Convert SGR sequences to HTML
@@ -458,6 +466,10 @@ function encode(string,start,end,i,ret,pos,sc,buf) {
                   dump[pos,y]=" "
                 }
               }
+          }
+          else if(cc=="U") {
+              # Revert last color
+	      if (spc) delete span[spc--]
           }
           else if(cc=="R") {
               # Reset attributes
